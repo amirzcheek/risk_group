@@ -1,0 +1,114 @@
+# ───────────────────────────────────────────────────────────────────────────
+# SQL-запросы к Платонусу (MySQL, доступ ТОЛЬКО на чтение).
+#
+# Это слой абстракции доступа к данным: имена таблиц и полей у каждой
+# инсталляции Платонуса свои, поэтому реальные запросы вынесены сюда, в конфиг.
+# Под свою инсталляцию подставьте настоящие имена таблиц/колонок вместо
+# плейсхолдеров `<...>`. Код в backend/platonus.py выполняет эти запросы как есть
+# и ожидает на выходе колонки с псевдонимами (AS), указанными ниже.
+#
+# ВАЖНО:
+#   * Запросы должны быть строго read-only (SELECT). Никаких изменений в Платонусе.
+#   * Не тяните персональные данные, без которых модель обходится (ИИН, телефоны,
+#     адреса). Достаточно стабильного внутреннего student_id.
+#   * Каждый запрос обязан вернуть колонки с ИМЕНАМИ, указанными в "ожидается".
+#   * Параметр :term (учебный период/семестр) подставляется кодом — оставьте его.
+#
+# Колонка `term` — это идентификатор учебного периода (например, "2024-2").
+# Колонка `week` — порядковый номер недели семестра события (1..N). Если в
+# Платонусе нет недель, вычислите её из даты события: FLOOR(DATEDIFF(дата,
+# начало_семестра)/7)+1.
+# ───────────────────────────────────────────────────────────────────────────
+
+# Список студентов и их демография/статус на интересующий период.
+# Целевая метка (отчисление/восстановление) берётся из status_events ниже.
+students: |
+  SELECT
+      s.<id>                AS student_id,
+      f.<name>              AS faculty,
+      g.<name>              AS study_group,
+      p.<name>              AS program,
+      e.<course_year>       AS course_year,        -- курс (1..4/5)
+      s.<gender>            AS gender,
+      s.<birth_year>        AS birth_year,
+      e.<admission_year>    AS admission_year,
+      e.<funding_type>      AS funding_type,        -- грант/платное
+      s.<region>           AS region,
+      e.<entry_gpa>        AS entry_gpa,            -- GPA при поступлении/ЕНТ
+      :term                AS term
+  FROM <students_table>   s
+  JOIN <enrollments_table> e ON e.<student_id> = s.<id>
+  JOIN <faculty_table>    f ON f.<id> = e.<faculty_id>
+  JOIN <group_table>      g ON g.<id> = e.<group_id>
+  JOIN <program_table>    p ON p.<id> = e.<program_id>
+  WHERE e.<term_field> = :term
+  # ожидается: student_id, faculty, study_group, program, course_year, gender,
+  #            birth_year, admission_year, funding_type, region, entry_gpa, term
+
+# Оценки по предметам понедельно (текущие/итоговые баллы, пересдачи).
+grades: |
+  SELECT
+      j.<student_id>       AS student_id,
+      :term                AS term,
+      j.<week>             AS week,
+      c.<code>             AS course_code,
+      c.<is_key>           AS is_key_course,        -- 1 для профилирующих дисциплин
+      j.<score>            AS score,                -- балл 0..100
+      j.<is_retake>        AS is_retake,            -- 1, если это пересдача
+      CASE WHEN j.<score> >= <pass_score> THEN 1 ELSE 0 END AS passed
+  FROM <gradebook_table> j
+  JOIN <courses_table>  c ON c.<id> = j.<course_id>
+  WHERE j.<term_field> = :term
+  # ожидается: student_id, term, week, course_code, is_key_course, score,
+  #            is_retake, passed
+
+# Посещаемость по неделям (агрегаты занятий и посещений).
+attendance: |
+  SELECT
+      a.<student_id>       AS student_id,
+      :term                AS term,
+      a.<week>             AS week,
+      a.<classes_total>    AS classes_total,        -- всего занятий за неделю
+      a.<classes_attended> AS classes_attended      -- посещено за неделю
+  FROM <attendance_table> a
+  WHERE a.<term_field> = :term
+  # ожидается: student_id, term, week, classes_total, classes_attended
+
+# Дедлайны/сдачи заданий: вовремя/с опозданием/не сдано.
+submissions: |
+  SELECT
+      d.<student_id>       AS student_id,
+      :term                AS term,
+      d.<week>             AS week,
+      d.<is_submitted>     AS is_submitted,         -- 1, если задание сдано
+      d.<on_time>          AS on_time               -- 1, если сдано в срок
+  FROM <submissions_table> d
+  WHERE d.<term_field> = :term
+  # ожидается: student_id, term, week, is_submitted, on_time
+
+# Активность в LMS/электронной среде (входы, обращения к материалам).
+activity: |
+  SELECT
+      l.<student_id>       AS student_id,
+      :term                AS term,
+      l.<week>             AS week,
+      l.<logins>           AS lms_logins,           -- число входов за неделю
+      l.<material_views>   AS material_views        -- просмотры материалов за неделю
+  FROM <lms_activity_table> l
+  WHERE l.<term_field> = :term
+  # ожидается: student_id, term, week, lms_logins, material_views
+
+# События статуса студента — ИСТОЧНИК ЦЕЛЕВОЙ МЕТКИ.
+# event_type: active | academic_leave | expelled | reinstated | graduated.
+# week — неделя семестра, на которой произошло событие. Отчисление (expelled)
+# СТРОГО ПОЗЖЕ недели отсечки формирует положительную метку (группа риска).
+status_events: |
+  SELECT
+      st.<student_id>      AS student_id,
+      :term                AS term,
+      st.<week>            AS week,
+      st.<event_type>      AS event_type,
+      st.<reason>          AS reason
+  FROM <status_history_table> st
+  WHERE st.<term_field> = :term
+  # ожидается: student_id, term, week, event_type, reason

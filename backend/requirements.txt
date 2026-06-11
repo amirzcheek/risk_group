@@ -1,0 +1,27 @@
+# Бэкенд системы группы риска (Early Warning).
+# Ядро — классическая ML-модель (LightGBM) на табличных данных. GPU не нужна.
+
+# HTTP-сервис
+fastapi
+uvicorn[standard]
+pydantic
+
+# ML и данные
+lightgbm
+scikit-learn
+pandas
+numpy
+pyyaml
+
+# Хранилище
+psycopg2-binary          # Postgres (если задан DATABASE_URL; иначе используется SQLite из stdlib)
+
+# Источник данных Платонус (MySQL, read-only). Нужен только при DATA_SOURCE=platonus.
+mysql-connector-python
+
+# LLM для текста уведомлений (Qwen3 через OVMS, OpenAI-совместимый API).
+# Нужен только если задан LLM_BASE_URL; иначе работает локальная заглушка.
+openai
+
+# Конфигурация из .env (необязательно)
+python-dotenv

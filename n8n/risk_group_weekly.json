@@ -1,0 +1,108 @@
+{
+  "name": "Группа риска — еженедельный прогон и алерты",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weekday": 1,
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "cron-weekly",
+      "name": "Каждый понедельник 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_API_BASE }}/score/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Service-Token", "value": "={{ $env.RISK_SERVICE_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"term\": null }",
+        "options": {}
+      },
+      "id": "http-score",
+      "name": "POST /score/run (батч-скоринг)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_API_BASE }}/notify/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Service-Token", "value": "={{ $env.RISK_SERVICE_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"limit\": 200 }",
+        "options": {}
+      },
+      "id": "http-notify",
+      "name": "POST /notify/run (тексты уведомлений)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "notifications",
+        "options": {}
+      },
+      "id": "split-notifications",
+      "name": "Разбить по студентам",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "early-warning@knus.edu.kz",
+        "toEmail": "={{ $env.ADVISOR_EMAIL }}",
+        "subject": "=Сигнал группы риска: {{ $json.student_id }} ({{ $json.study_group }})",
+        "emailFormat": "text",
+        "text": "={{ $json.message }}\n\n— Система раннего предупреждения KNUS. Это вероятностный сигнал, а не приговор."
+      },
+      "id": "send-email",
+      "name": "Отправить эдвайзеру (email)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Каждый понедельник 06:00": {
+      "main": [[{ "node": "POST /score/run (батч-скоринг)", "type": "main", "index": 0 }]]
+    },
+    "POST /score/run (батч-скоринг)": {
+      "main": [[{ "node": "POST /notify/run (тексты уведомлений)", "type": "main", "index": 0 }]]
+    },
+    "POST /notify/run (тексты уведомлений)": {
+      "main": [[{ "node": "Разбить по студентам", "type": "main", "index": 0 }]]
+    },
+    "Разбить по студентам": {
+      "main": [[{ "node": "Отправить эдвайзеру (email)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "_comment": "Переменные окружения n8n: RISK_API_BASE (например http://risk-backend:8000), RISK_SERVICE_TOKEN (совпадает с SERVICE_TOKEN бэкенда), ADVISOR_EMAIL. Маршрутизацию адреса эдвайзера по факультету/группе можно добавить узлом перед отправкой."
+}
