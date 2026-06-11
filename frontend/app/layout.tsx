@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NavLinks } from "@/components/nav-links";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,14 +13,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru">
       <body>
         <header className="border-b bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="font-semibold text-zinc-800">
+          <div className="mx-auto max-w-6xl px-5 py-3 flex items-center gap-4 flex-wrap">
+            <Link href="/" className="text-[17px] font-bold text-zinc-800">
               Группа риска · Early Warning
             </Link>
-            <nav className="flex gap-4 text-sm text-zinc-600">
-              <Link href="/" className="hover:text-zinc-900">Список риска</Link>
-              <Link href="/summary" className="hover:text-zinc-900">Сводка</Link>
-            </nav>
+            <NavLinks />
+            <a
+              href="https://ai.knus.edu.kz/"
+              className="ml-auto inline-block whitespace-nowrap rounded-md border px-3 py-1.5 text-sm font-semibold text-[#2356c7] transition-colors hover:border-[#2356c7] hover:bg-[#eef1f7]"
+            >
+              ← Вернуться на портал
+            </a>
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>

@@ -13,6 +13,9 @@ export default function RiskListPage() {
   const [faculty, setFaculty] = useState("");
   const [group, setGroup] = useState("");
   const [level, setLevel] = useState("");
+  // Полный список факультетов — берём один раз из неотфильтрованной выборки,
+  // чтобы выпадающий список не схлопывался после применения фильтра.
+  const [allFaculties, setAllFaculties] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +41,25 @@ export default function RiskListPage() {
     load();
   }, [load]);
 
-  const faculties = Array.from(new Set(items.map((i) => i.faculty).filter(Boolean))) as string[];
+  // Один раз грузим полный список факультетов (без фильтров) для выпадающего меню.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/risk");
+        const data: RiskListResponse & { error?: string } = await res.json();
+        if (res.ok && !data.error) {
+          const facs = Array.from(
+            new Set(data.items.map((i) => i.faculty).filter(Boolean))
+          ) as string[];
+          setAllFaculties(facs.sort());
+        }
+      } catch {
+        /* список факультетов не критичен — молча игнорируем */
+      }
+    })();
+  }, []);
+
+  const faculties = allFaculties;
 
   return (
     <div className="space-y-4">
@@ -93,6 +114,7 @@ export default function RiskListPage() {
             </select>
           </label>
           <button
+            type="button"
             onClick={load}
             className="ml-auto rounded-md bg-zinc-800 text-white px-4 py-1.5 text-sm hover:bg-zinc-700"
           >
