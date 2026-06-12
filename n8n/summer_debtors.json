@@ -1,0 +1,97 @@
+{
+  "name": "Летний семестр — рассылка должникам",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Запуск вручную (деканат)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_API_BASE }}/summer/notify/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Service-Token", "value": "={{ $env.RISK_SERVICE_TOKEN }}" },
+            { "name": "X-Actor", "value": "n8n-decanat" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"limit\": 1000 }",
+        "options": {}
+      },
+      "id": "http-summer",
+      "name": "POST /summer/notify/run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "notifications",
+        "options": {}
+      },
+      "id": "split",
+      "name": "Разбить по студентам",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-email",
+      "name": "Есть email?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "decanat@knus.edu.kz",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}"
+      },
+      "id": "send-email",
+      "name": "Отправить студенту (email)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Запуск вручную (деканат)": {
+      "main": [[{ "node": "POST /summer/notify/run", "type": "main", "index": 0 }]]
+    },
+    "POST /summer/notify/run": {
+      "main": [[{ "node": "Разбить по студентам", "type": "main", "index": 0 }]]
+    },
+    "Разбить по студентам": {
+      "main": [[{ "node": "Есть email?", "type": "main", "index": 0 }]]
+    },
+    "Есть email?": {
+      "main": [[{ "node": "Отправить студенту (email)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "_comment": "Рассылка должникам о летнем семестре. Запуск РУЧНОЙ (деканат подтверждает), не по расписанию — рассылка необратима. Переменные: RISK_API_BASE, RISK_SERVICE_TOKEN (= SERVICE_TOKEN бэкенда). Тексты писем формирует бэкенд по строгому шаблону (без LLM). Сопоставление студент↔email уже сделано на бэкенде (students.mail)."
+}

@@ -93,6 +93,33 @@ LLM_MODEL = os.getenv("LLM_MODEL", "")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
 
 
+# ─────────────────────────── Летний семестр (должники) ───────────────────────────
+# Отдельная функция: рассылка должникам с предложением летнего семестра.
+# Доступ — ТОЛЬКО деканат/админ (см. SERVICE_TOKEN и роль на фронте).
+# Студент попадает на летник, если по дисциплине итоговый рейтинг ниже порога.
+SUMMER_PASS_THRESHOLD = float(os.getenv("SUMMER_PASS_THRESHOLD", "50"))
+# Стоимость одного кредита обучения в летнем семестре (тенге).
+CREDIT_COST_SUMMER = int(os.getenv("CREDIT_COST_SUMMER", "16000"))
+# Ссылка EDMS для подачи заявления на летний семестр (плейсхолдер).
+EDMS_APPLICATION_URL = os.getenv("EDMS_APPLICATION_URL", "https://edms.knus.edu.kz/")
+# Ссылка на получение ЭЦП.
+ECP_INFO_URL = os.getenv(
+    "ECP_INFO_URL",
+    "https://egov.kz/cms/ru/services/reservation_for_busunesses/pass_onlineecp",
+)
+
+# ── SMTP для отправки писем должникам ──
+# Если SMTP_HOST не задан — отправка работает в ДЕМО-РЕЖИМЕ (dry-run): письма
+# не уходят (важно для синтетики с фейковыми адресами), но весь поток проверяется.
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() in ("1", "true", "yes")
+SMTP_FROM = os.getenv("SMTP_FROM", "decanat@knus.edu.kz")
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Деканат КНУС")
+
+
 # ─────────────────────────── Безопасность и доступ ───────────────────────────
 # Токен для защищённых операций (POST /score/run, /train, /notify/run).
 # Передаётся в заголовке X-Service-Token.

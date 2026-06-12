@@ -4,33 +4,35 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
-// Пункты навигации в стиле прошлых агентов (таблетки с активным состоянием).
+// Основные пункты навигации (доступны всем ролям).
 const LINKS = [
   { href: "/", label: "Список риска" },
   { href: "/summary", label: "Сводка" },
 ];
 
-export function NavLinks() {
+export function NavLinks({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
   return (
-    <nav className="flex gap-1.5">
-      {LINKS.map((l) => {
-        const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
-        return (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={clsx(
-              "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
-              active
-                ? "bg-[#eef1f7] text-[#2356c7]"
-                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
-            )}
-          >
-            {l.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      {LINKS.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          className={clsx("nav-pill", isActive(l.href) && "active")}
+        >
+          {l.label}
+        </Link>
+      ))}
+      {/* Админ-пилюля «Рассылка должникам» — видна только админам (роль портала admin),
+          по аналогии с пунктом «Админка» в топбаре портала. */}
+      {isAdmin && (
+        <Link href="/summer" className={clsx("admin-pill", isActive("/summer") && "active")}>
+          Рассылка должникам
+        </Link>
+      )}
+    </>
   );
 }

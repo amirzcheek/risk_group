@@ -41,6 +41,24 @@ COURSES = ["MATH101", "PHYS102", "PROG103", "ENG104", "PHED105"]
 KEY_COURSES = {"MATH101", "PROG103"}  # профилирующие дисциплины
 PASS_SCORE = 50  # порог зачёта балла
 
+# Человекочитаемые названия и кредиты ЕКТS дисциплин (для писем о летнем семестре).
+COURSE_NAMES = {
+    "MATH101": "Математика",
+    "PHYS102": "Физика",
+    "PROG103": "Программирование",
+    "ENG104": "Иностранный язык",
+    "PHED105": "Физическая культура",
+}
+COURSE_CREDITS = {"MATH101": 5, "PHYS102": 4, "PROG103": 5, "ENG104": 3, "PHED105": 2}
+
+# Списки имён для генерации синтетических ФИО (только для демо рассылки писем).
+_LAST_NAMES = ["Бауржанов", "Сериков", "Нұрланов", "Ахметов", "Оспанов", "Жумабеков",
+               "Қайратов", "Сагынбаев", "Төлеген", "Ибраев", "Мұратов", "Әлиев"]
+_FIRST_M = ["Бекжан", "Арман", "Дамир", "Нұржан", "Алишер", "Ерлан", "Тимур", "Санжар"]
+_FIRST_F = ["Айгерим", "Дана", "Аружан", "Малика", "Жанель", "Камила", "Аяна", "Дильназ"]
+_PATRON_M = ["Каиржанович", "Серикұлы", "Нұрланұлы", "Ахметұлы", "Мұратұлы", "Ерланұлы"]
+_PATRON_F = ["Каиржановна", "Серікқызы", "Нұрланқызы", "Ахметқызы", "Мұратқызы"]
+
 FACULTIES = {
     "Факультет ИТ": ["ИТ-21", "ИТ-22", "ИТ-23", "ВТ-21", "ВТ-22"],
     "Факультет экономики": ["ЭК-21", "ЭК-22", "ФН-21", "ФН-22"],
@@ -100,6 +118,23 @@ def generate(n_students: int = 1300, seed: int = 42) -> dict[str, pd.DataFrame]:
     base["admission_year"] = rng.choice([2021, 2022, 2023], size=n_students)
     base["birth_year"] = (base["admission_year"] - 18 - rng.integers(0, 3, n_students)).astype(int)
 
+    # ФИО и email (только для демо рассылки писем должникам; в риск-модель не идут).
+    # Используем ОТДЕЛЬНЫЙ генератор, чтобы не сдвигать основной поток случайных
+    # чисел (данные модели остаются воспроизводимыми независимо от этого блока).
+    nrng = np.random.default_rng(seed + 1000)
+    fio_list, email_list = [], []
+    for i in range(n_students):
+        last = nrng.choice(_LAST_NAMES)
+        if gender[i] == "М":
+            fio = f"{last} {nrng.choice(_FIRST_M)} {nrng.choice(_PATRON_M)}"
+        else:
+            # женские фамилии оставляем в исходной форме для простоты демо
+            fio = f"{last}а {nrng.choice(_FIRST_F)} {nrng.choice(_PATRON_F)}"
+        fio_list.append(fio)
+        email_list.append(f"{student_ids[i].lower()}@stud.knus.edu.kz")
+    base["fio"] = fio_list
+    base["email"] = email_list
+
     students_rows = []
     grades_rows = []
     attendance_rows = []
@@ -152,6 +187,8 @@ def generate(n_students: int = 1300, seed: int = 42) -> dict[str, pd.DataFrame]:
             students_rows.append(
                 {
                     "student_id": sid,
+                    "fio": base["fio"].iat[i],
+                    "email": base["email"].iat[i],
                     "faculty": base["faculty"].iat[i],
                     "study_group": base["study_group"].iat[i],
                     "program": base["program"].iat[i],

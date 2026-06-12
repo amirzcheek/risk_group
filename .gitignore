@@ -24,3 +24,7 @@ frontend/.env
 
 # Локальные настройки Claude Code
 .claude/settings.local.json
+
+# Файлы с реальными ПДн студентов (не коммитить!)
+*.docx
+student_*_portfolio.docx

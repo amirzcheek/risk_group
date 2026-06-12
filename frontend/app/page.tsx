@@ -113,11 +113,7 @@ export default function RiskListPage() {
               <option value="low">Низкий</option>
             </select>
           </label>
-          <button
-            type="button"
-            onClick={load}
-            className="ml-auto rounded-md bg-zinc-800 text-white px-4 py-1.5 text-sm hover:bg-zinc-700"
-          >
+          <button type="button" onClick={load} className="ml-auto btn-accent px-4 py-1.5 text-sm">
             Обновить
           </button>
         </CardBody>
@@ -152,7 +148,7 @@ export default function RiskListPage() {
               {items.map((s) => (
                 <tr key={s.student_id} className="border-b last:border-0 hover:bg-zinc-50">
                   <td className="px-4 py-2">
-                    <Link href={`/student/${s.student_id}`} className="text-blue-600 hover:underline">
+                    <Link href={`/student/${s.student_id}`} className="text-[var(--accent)] hover:underline">
                       {s.student_id}
                     </Link>
                   </td>

@@ -30,14 +30,14 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   if (error || !student)
     return (
       <div className="space-y-3">
-        <Link href="/" className="text-blue-600 text-sm hover:underline">← К списку</Link>
+        <Link href="/" className="text-[var(--accent)] text-sm hover:underline">← К списку</Link>
         <Card><CardBody className="text-red-600 text-sm">{error || "Нет данных"}</CardBody></Card>
       </div>
     );
 
   return (
     <div className="space-y-4">
-      <Link href="/" className="text-blue-600 text-sm hover:underline">← К списку группы риска</Link>
+      <Link href="/" className="text-[var(--accent)] text-sm hover:underline">← К списку группы риска</Link>
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>

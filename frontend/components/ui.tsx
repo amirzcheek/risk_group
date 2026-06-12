@@ -3,9 +3,7 @@ import clsx from "clsx";
 import type { RiskLevel, Factor } from "@/lib/types";
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={clsx("rounded-xl border bg-white shadow-sm", className)}>{children}</div>
-  );
+  return <div className={clsx("card", className)}>{children}</div>;
 }
 
 export function CardBody({ children, className }: { children: React.ReactNode; className?: string }) {

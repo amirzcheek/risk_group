@@ -81,6 +81,21 @@ class ScoreRequest(BaseModel):
     top_fraction: Optional[float] = None
 
 
+class SummerRequest(BaseModel):
+    term: Optional[str] = None
+    threshold: Optional[float] = None
+    limit: int = 1000
+
+
+class SummerSendRequest(BaseModel):
+    term: Optional[str] = None
+    threshold: Optional[float] = None
+    # Если указан student_id — отправляем письмо ТОЛЬКО этому студенту;
+    # иначе — всем должникам.
+    student_id: Optional[str] = None
+    limit: int = 1000
+
+
 # ───────────────────────────── Эндпоинты ─────────────────────────────
 
 
@@ -219,4 +234,108 @@ def notify_run(
         "count": len(notifications),
         "disclaimer": DISCLAIMER,
         "notifications": notifications,
+    }
+
+
+# ─────────────────────── Летний семестр (должники) — ТОЛЬКО деканат/админ ───────────────────────
+
+
+@app.get("/debtors")
+def debtors_list(
+    term: Optional[str] = Query(None),
+    threshold: Optional[float] = Query(None),
+    token: Optional[str] = Header(None, alias="X-Service-Token"),
+    actor: Optional[str] = Header(None, alias="X-Actor"),
+):
+    """Список должников с дисциплинами-задолженностями и суммой на летний семестр.
+
+    Чувствительные данные (ФИО, email, суммы) — доступ ТОЛЬКО деканату/админу.
+    """
+    _check_token(token)
+    import debtors as debtors_mod
+
+    storage.log_access(actor, "view_debtors", target=term or "latest")
+    try:
+        items = debtors_mod.compute_debtors(term=term, threshold=threshold)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Ошибка расчёта должников: {e}")
+    return {
+        "count": len(items),
+        "credit_cost": config.CREDIT_COST_SUMMER,
+        "threshold": threshold if threshold is not None else config.SUMMER_PASS_THRESHOLD,
+        "items": items,
+    }
+
+
+@app.post("/summer/notify/run")
+def summer_notify_run(
+    req: SummerRequest,
+    token: Optional[str] = Header(None, alias="X-Service-Token"),
+    actor: Optional[str] = Header(None, alias="X-Actor"),
+):
+    """Для n8n: собрать письма должникам о летнем семестре (строгий шаблон, без LLM).
+
+    Возвращает готовые письма (email, тема, текст) для рассылки. Доступ — деканат/админ.
+    """
+    _check_token(token)
+    import debtors as debtors_mod
+
+    notifications = debtors_mod.build_notifications(term=req.term, threshold=req.threshold)
+    notifications = notifications[: req.limit]
+    storage.log_access(
+        actor, "summer_notify_run", target=req.term or "latest",
+        detail={"count": len(notifications)},
+    )
+    return {"count": len(notifications), "notifications": notifications}
+
+
+@app.post("/summer/send")
+def summer_send(
+    req: SummerSendRequest,
+    token: Optional[str] = Header(None, alias="X-Service-Token"),
+    actor: Optional[str] = Header(None, alias="X-Actor"),
+):
+    """Отправить письма должникам: всем или одному (если задан student_id).
+
+    Доступ — деканат/админ (токен). Без настроенного SMTP работает демо-режим
+    (dry-run): письма не уходят. Каждая отправка пишется в журнал доступа.
+    """
+    _check_token(token)
+    import debtors as debtors_mod
+    import mailer
+
+    notifications = debtors_mod.build_notifications(term=req.term, threshold=req.threshold)
+    if req.student_id:
+        notifications = [n for n in notifications if n["student_id"] == req.student_id]
+        if not notifications:
+            raise HTTPException(status_code=404, detail="Студент не найден среди должников")
+    notifications = notifications[: req.limit]
+
+    results = []
+    counts = {"sent": 0, "dry-run": 0, "error": 0}
+    for n in notifications:
+        r = mailer.send_email(n["email"], n["subject"], n["body"])
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+        results.append(
+            {
+                "student_id": n["student_id"],
+                "fio": n["fio"],
+                "email": n["email"],
+                "status": r["status"],
+                "detail": r["detail"],
+            }
+        )
+    storage.log_access(
+        actor,
+        "summer_send_one" if req.student_id else "summer_send_all",
+        target=req.student_id or "all",
+        detail={"total": len(results), **counts},
+    )
+    return {
+        "mode": "sent" if mailer.smtp_configured() else "dry-run",
+        "total": len(results),
+        "sent": counts["sent"],
+        "dry_run": counts["dry-run"],
+        "errors": counts["error"],
+        "results": results,
     }
